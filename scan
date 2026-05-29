@@ -1,0 +1,57 @@
+# Importe Scanner depuis bluepy pour détecter les appareils Bluetooth
+from bluepy.btle import Scanner
+
+# Importe time pour faire des pauses entre les scans
+import time
+
+# Importe csv pour sauvegarder les données
+import csv
+
+# Importe datetime pour l'horodatage
+from datetime import datetime
+
+
+# Crée l'objet qui va permettre de lancer les scans Bluetooth
+scanner = Scanner()
+
+# Nom du fichier CSV
+FICHIER_CSV = "scan_bluetooth.csv"
+
+# Crée le fichier CSV avec les en-têtes au démarrage
+with open(FICHIER_CSV, mode='w', newline='') as f:
+    writer = csv.writer(f)
+    writer.writerow(["Horodatage", "Adresse MAC", "Type adresse", "RSSI (dB)"])
+
+print("Scan Bluetooth en cours... Ctrl+C pour arrêter")
+print(f"Données sauvegardées dans : {FICHIER_CSV}\n")
+
+
+# Boucle infinie : le programme scanne en continu
+while True:
+
+    # Lance un scan Bluetooth pendant 5 secondes
+    # Les appareils détectés sont stockés dans la variable devices
+    devices = scanner.scan(timeout=5.0)
+
+    # Affiche un titre avant chaque nouveau scan
+    print("\n--- Scan ---")
+
+    # Parcourt tous les appareils trouvés pendant le scan
+    for device in devices:
+
+        # Récupère l'heure actuelle
+        horodatage = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Affiche l'adresse Bluetooth, le type d'adresse et la puissance du signal
+        print(f"{horodatage} | {device.addr} | {device.addrType} | RSSI={device.rssi} dB")
+
+        # Sauvegarde la ligne dans le fichier CSV
+        with open(FICHIER_CSV, mode='a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([horodatage, device.addr, device.addrType, device.rssi])
+
+    # Attend 1 seconde avant de recommencer un scan
+    time.sleep(1)
+
+scan_bluepy_basique.py
+Affichage de scan_bluepy_basique.py.
