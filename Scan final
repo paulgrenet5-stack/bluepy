@@ -1,0 +1,91 @@
+# Importe Scanner
+from bluepy.btle import Scanner
+import time
+import csv
+from datetime import datetime
+
+# Dictionnaire de tes 3 capteurs
+MES_CAPTEURS = {
+    "d6:1c:bf:b7:76:62": "DEMO 1",
+    "d6:c6:c7:39:a2:e8": "DEMO 2",
+    "d7:ef:13:27:15:29": "DEMO 3",
+    "d1:bf:9d:01:3e:11": "DEMO 4"
+
+}
+
+FICHIER_CSV = "scan_bt04_datas.csv"
+
+def decoder_donnees_bt04(donnees_hex):
+    # La documentation indique que les données sont diffusées en "Type 0x16"
+    # avec l'UUID FFCB.
+    try:
+        # On vérifie l'UUID
+        if not (donnees_hex.startswith("ffcb") or donnees_hex.startswith("cbff")):
+            return None, None, None
+
+        # Vérification de la longueur minimale du paquet
+        if len(donnees_hex) < 32:
+            return None, None, None
+
+        # D'après le protocole :
+        # E: Batterie (1 byte) à l'index 10 (caractères 20-21 de la chaine hex)
+        batt_hex = donnees_hex[20:22]
+        batterie = int(batt_hex, 16)
+
+        # G: Température (2 bytes) à l'index 12-13 (caractères 24-27)
+        temp_hex = donnees_hex[24:28]
+        temp_raw = int(temp_hex, 16)
+        
+        # Le protocole dit que le bit 14 indique le signe (0 positif, 1 négatif)
+        est_negatif = (temp_raw & 0x4000) != 0
+        
+        # On masque pour obtenir la valeur réelle sans les bits de statut
+        temp_valeur = temp_raw & 0x3FFF
+        temperature = temp_valeur / 100.0
+        if est_negatif:
+            temperature = -temperature
+
+        # H: Humidité (2 bytes) à l'index 14-15 (caractères 28-31)
+        hum_hex = donnees_hex[28:32]
+        hum_raw = int(hum_hex, 16)
+        
+        # On masque le 1er bit de statut, et on divise par 100
+        humidite = (hum_raw & 0x7FFF) / 100.0
+
+        return temperature, humidite, batterie
+    except Exception:
+        return None, None, None
+
+scanner = Scanner()
+
+with open(FICHIER_CSV, mode='w', newline='') as f:
+    writer = csv.writer(f)
+    writer.writerow(["Horodatage", "Nom", "Adresse MAC", "Température (°C)", "Humidité (%)", "Batterie (%)", "RSSI (dB)"])
+
+print("Scan passif des capteurs BT04 en cours... Ctrl+C pour arrêter")
+print(f"Données décodées et sauvegardées dans : {FICHIER_CSV}\n")
+
+while True:
+    devices = scanner.scan(timeout=3.0)
+
+    for device in devices:
+        mac = device.addr.lower()
+        
+        if mac in MES_CAPTEURS:
+            nom = MES_CAPTEURS[mac]
+            
+            # Récupérer les paquets de broadcast (ScanData)
+            for (ad_type, desc, value) in device.getScanData():
+                # 0x16 = 22 en décimal (Service Data)
+                if ad_type == 22:
+                    temp, hum, batt = decoder_donnees_bt04(value)
+                    
+                    if temp is not None:
+                        horodatage = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        print(f"✅ [{nom}] {horodatage} | Temp: {temp}°C | Hum: {hum}% | Batterie: {batt}% | RSSI: {device.rssi} dB")
+                        
+                        with open(FICHIER_CSV, mode='a', newline='') as f:
+                            writer = csv.writer(f)
+                            writer.writerow([horodatage, nom, mac, temp, hum, batt, device.rssi])
+    
+    time.sleep(1)
