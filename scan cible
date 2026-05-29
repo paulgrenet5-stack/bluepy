@@ -1,0 +1,49 @@
+# Importe Scanner depuis bluepy pour détecter les appareils Bluetooth
+from bluepy.btle import Scanner
+import time
+import csv
+from datetime import datetime
+
+# Crée l'objet qui va permettre de lancer les scans Bluetooth
+scanner = Scanner()
+
+# Nom du fichier CSV
+FICHIER_CSV = "scan_bluetooth_filtre.csv"
+
+# Crée le fichier CSV avec les en-têtes au démarrage
+with open(FICHIER_CSV, mode='w', newline='') as f:
+    writer = csv.writer(f)
+    writer.writerow(["Horodatage", "Nom", "Adresse MAC", "Type adresse", "RSSI (dB)"])
+
+print("Scan Bluetooth avec filtre en cours... Ctrl+C pour arrêter")
+print(f"Données sauvegardées dans : {FICHIER_CSV}\n")
+
+while True:
+    devices = scanner.scan(timeout=5.0)
+    print("\n--- Scan ---")
+
+    for device in devices:
+        mac = device.addr.lower()
+        
+        # Filtre pour isoler uniquement tes 3 capteurs
+        if mac == "d6:1c:bf:b7:76:62" or mac == "d6:c6:c7:39:a2:e8" or mac == "d7:ef:13:27:15:29":
+            
+            # Attribution des noms
+            if mac == "d6:1c:bf:b7:76:62":
+                nom = "DEMO 1"
+            elif mac == "d6:c6:c7:39:a2:e8":
+                nom = "DEMO 2"
+            elif mac == "d7:ef:13:27:15:29":
+                nom = "DEMO 3"
+
+            horodatage = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            # Affiche uniquement les capteurs isolés
+            print(f"{horodatage} | {nom} | {device.addr} | RSSI={device.rssi} dB")
+
+            # Sauvegarde dans le CSV
+            with open(FICHIER_CSV, mode='a', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow([horodatage, nom, device.addr, device.addrType, device.rssi])
+
+    time.sleep(1)
